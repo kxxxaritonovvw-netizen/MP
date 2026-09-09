@@ -1,0 +1,42 @@
+const http = require('node:http');
+const fs = require('node:fs');
+const path = require('node:path');
+const files = new Set(['index.html', 'app.js', 'style.css', 'modal.js', 'modal.css']);
+const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.flac': 'audio/flac' };
+const server = http.createServer((req, res) => {
+  if (!['GET', 'HEAD'].includes(req.method)) { res.writeHead(405, { Allow: 'GET, HEAD' }); res.end(); return; }
+  let name;
+  try { name = decodeURIComponent(new URL(req.url, 'http://localhost').pathname).slice(1) || 'index.html'; }
+  catch { res.writeHead(400); res.end(); return; }
+  const isAudio = /^audio\/[\w -]+\.(mp3|m4a|ogg|wav|flac)$/i.test(name);
+  if (!files.has(name) && !isAudio) { res.writeHead(404); res.end(); return; }
+  const filename = path.join(__dirname, name);
+  fs.stat(filename, (error, stat) => {
+    if (error || !stat.isFile()) { res.writeHead(404); res.end(); return; }
+    const headers = { 'Content-Type': types[path.extname(name).toLowerCase()], 'Cache-Control': 'no-store', 'Accept-Ranges': 'bytes' };
+    let start = 0, end = stat.size - 1, status = 200;
+    if (req.headers.range) {
+      const match = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range);
+      if (match && (match[1] || match[2])) {
+        start = match[1] ? Number(match[1]) : Math.max(0, stat.size - Number(match[2]));
+        end = match[1] && match[2] ? Math.min(Number(match[2]), end) : end;
+      } else start = NaN;
+      if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start > end || start >= stat.size) {
+        res.writeHead(416, { 'Content-Range': 'bytes */' + stat.size }); res.end(); return;
+      }
+      status = 206;
+      headers['Content-Range'] = 'bytes ' + start + '-' + end + '/' + stat.size;
+    }
+    headers['Content-Length'] = Math.max(0, end - start + 1);
+    res.writeHead(status, headers);
+    if (req.method === 'HEAD' || stat.size === 0) { res.end(); return; }
+    const stream = fs.createReadStream(filename, { start, end });
+    stream.on('error', () => res.destroy());
+    res.on('close', () => stream.destroy());
+    stream.pipe(res);
+  });
+});
+if (require.main === module || require.main?.filename.endsWith('serve.cjs')) {
+  server.listen(4173, '127.0.0.1', () => console.log('FIELD: http://127.0.0.1:4173'));
+}
+module.exports = server;

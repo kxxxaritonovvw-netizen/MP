@@ -1,0 +1,14 @@
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;color:#fff;font-family:Arial,Helvetica,sans-serif}#app{position:relative;width:100%;height:100%;background:#000}#field{display:block;width:100%;height:100%;cursor:grab;touch-action:none;outline:none}#field:focus-visible{outline:1px solid #777;outline-offset:-2px}#field.dragging{cursor:grabbing}
+/* Wide, gradual fade into the black canvas; gestures pass through. */
+#app::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to right, #000 0%, #000000e8 10%, #000000b8 25%, #00000073 45%, #00000030 67%, #0000 100%) left / clamp(100px, 15vw, 290px) 100% no-repeat,
+    linear-gradient(to left, #000 0%, #000000e8 10%, #000000b8 25%, #00000073 45%, #00000030 67%, #0000 100%) right / clamp(100px, 15vw, 290px) 100% no-repeat,
+    linear-gradient(to bottom, #000 0%, #000000e8 10%, #000000b8 25%, #00000073 45%, #00000030 67%, #0000 100%) top / 100% clamp(100px, 20vh, 220px) no-repeat,
+    linear-gradient(to top, #000 0%, #000000e8 10%, #000000b8 25%, #00000073 45%, #00000030 67%, #0000 100%) bottom / 100% clamp(100px, 20vh, 220px) no-repeat;
+}
+
