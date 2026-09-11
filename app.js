@@ -3,7 +3,7 @@
   const canvas = document.querySelector('#field');
   const ctx = canvas.getContext('2d', { alpha: false });
   let width=0,height=0,scale=1,dpr=1,x=0,y=0,vx=0,vy=0,raf=0,lastTime=0,drag=null;
-  const size=300,minSize=300,maxSize=390,chunkSize=510;
+  const size=300,minSize=250,maxSize=370,chunkSize=455;
   const candidates=new Map();
   const effects=new Map();
   const coverColors=new WeakMap();
@@ -72,12 +72,12 @@
   function updateHover(){
     const hit=!openedTile&&!drag&&pointer&&visibleTiles.find(t=>{
       const cx=Math.max(t.px+t.radius,Math.min(pointer.x,t.px+t.w-t.radius));
-      const cy=Math.max(t.py+t.radius,Math.min(pointer.y,t.py+t.w-t.radius));
+      const cy=Math.max(t.py+t.radius,Math.min(pointer.y,t.py+t.h-t.radius));
       return Math.hypot(pointer.x-cx,pointer.y-cy)<=t.radius;
     });
     const key=hit?hit.key:null;
     if(hit&&key!==hoveredKey){
-      effects.set(key,{amount:1,start:performance.now(),u:(pointer.x-hit.px)/hit.w,v:(pointer.y-hit.py)/hit.w});
+      effects.set(key,{amount:1,start:performance.now(),u:(pointer.x-hit.px)/hit.w,v:(pointer.y-hit.py)/hit.h});
     }
     hoveredKey=key;
     if(effects.size&&!effectFrame)effectFrame=requestAnimationFrame(animateEffects);
@@ -92,7 +92,8 @@
     effectFrame=effects.size?requestAnimationFrame(animateEffects):0;
   }
   function paintEffect(tile,effect){
-    const {px,py,w}=tile;
+    const {px,py,w,h}=tile;
+    const unit=Math.min(w,h);
     const time=reducedMotion.matches ? .35 : (performance.now()-effect.start)/1000;
     const phase=time*1.7;
     const farEdge=Math.hypot(Math.max(effect.u,1-effect.u),Math.max(effect.v,1-effect.v));
@@ -112,8 +113,8 @@
       const edge=Math.pow(Math.max(0,1-outside/.9),2);
       const alpha=(layer===0?.048:.085)*(.55+noise(3)*.6)*effect.amount*fade*edge;
       if(alpha<.001)continue;
-      const radius=w*((layer===0?.46:.24)+noise(4)*.18);
-      const cx=px+u*w,cy=py+v*w;
+      const radius=unit*((layer===0?.46:.24)+noise(4)*.18);
+      const cx=px+u*w,cy=py+v*h;
       const start=palette||{h:22,s:90};
       const end=palette?.accent||palette||{h:45,s:100};
       const blend=Math.min(1,progress/.85),smooth=blend*blend*(3-2*blend);
@@ -131,40 +132,41 @@
     ctx.restore();
   }
   function paintCard(tile,effect){
-    const {px,py,w,radius}=tile;
+    const {px,py,w,h,radius}=tile;
+    const unit=Math.min(w,h);
     ctx.save();
     ctx.shadowColor='rgba(0,0,0,0.65)';
     ctx.shadowBlur=32*scale*dpr;
     ctx.shadowOffsetY=12*scale*dpr;
     // A subtle face gradient keeps the depth visible against the pure black canvas.
-    const surface=ctx.createLinearGradient(px,py,px+w*.25,py+w);
+    const surface=ctx.createLinearGradient(px,py,px+w*.25,py+h);
     const shades=tile.surface||['#252525','#1e1e1e','#191919'];
     surface.addColorStop(0,shades[0]);
     surface.addColorStop(.5,shades[1]);
     surface.addColorStop(1,shades[2]);
     ctx.fillStyle=surface;ctx.beginPath();
-    if(!effect||reducedMotion.matches){ctx.roundRect(px,py,w,w,radius);ctx.fill();ctx.restore();return;}
+    if(!effect||reducedMotion.matches){ctx.roundRect(px,py,w,h,radius);ctx.fill();ctx.restore();return;}
     const time=(performance.now()-effect.start)/1000;
     const farEdge=Math.hypot(Math.max(effect.u,1-effect.u),Math.max(effect.v,1-effect.v));
     let first=true;
     function point(xx,yy){
-      const u=xx/w,v=yy/w,distance=Math.hypot(u-effect.u,v-effect.v);
+      const u=xx/w,v=yy/h,distance=Math.hypot(u-effect.u,v-effect.v);
       const progress=Math.max(0,Math.min(1,distance/farEdge));
       const fade=1-progress*progress*(3-2*progress);
       const heat=Math.exp(-Math.pow((distance-time*1.7)/.5,2));
-      const amplitude=Math.min(4.68,w*.0156)*(1+.4*(1-progress))*effect.amount*fade*heat;
+      const amplitude=Math.min(4.68,unit*.0156)*(1+.4*(1-progress))*effect.amount*fade*heat;
       const dx=(Math.sin(v*12-time*5+u*3)+.15*Math.sin(v*24-time*7))*amplitude;
       const dy=(Math.sin(u*11-time*4+v*3)+.15*Math.sin(u*22+time*6))*amplitude*.65;
       if(first){ctx.moveTo(px+xx+dx,py+yy+dy);first=false;}else ctx.lineTo(px+xx+dx,py+yy+dy);
     }
     // Sample a rounded outline, then refract it locally as the heat wave passes.
-    const corners=[[w-radius,radius,-Math.PI/2],[w-radius,w-radius,0],[radius,w-radius,Math.PI/2],[radius,radius,Math.PI]];
+    const corners=[[w-radius,radius,-Math.PI/2],[w-radius,h-radius,0],[radius,h-radius,Math.PI/2],[radius,radius,Math.PI]];
     for(let k=0;k<4;k++){
       const [cx,cy,angle]=corners[k];
       for(let i=0;i<=12;i++){const a=angle+i/12*Math.PI/2;point(cx+Math.cos(a)*radius,cy+Math.sin(a)*radius);}
       const end=angle+Math.PI/2,ex=cx+Math.cos(end)*radius,ey=cy+Math.sin(end)*radius;
       const next=corners[(k+1)%4],nx=next[0]+Math.cos(next[2])*radius,ny=next[1]+Math.sin(next[2])*radius;
-      const steps=Math.ceil((w-2*radius)/4);
+      const steps=Math.max(2,Math.ceil(Math.hypot(nx-ex,ny-ey)/4));
       for(let i=1;i<steps;i++)point(ex+(nx-ex)*i/steps,ey+(ny-ey)*i/steps);
     }
     ctx.closePath();ctx.fill();ctx.restore();
@@ -174,7 +176,9 @@
     if(candidates.has(key))return candidates.get(key);
     let seed=(Math.imul(col,73856093)^Math.imul(row,19349663)^91827)>>>0;
     const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
-    const tile={x:col*chunkSize+(random()-.5)*chunkSize*.55,y:row*chunkSize+(random()-.5)*chunkSize*.55,size:minSize+random()*(maxSize-minSize),priority:random(),gap:85+random()*55};
+    const size=minSize+random()*(maxSize-minSize);
+    const shape=random(),ratio=shape<.5?1:shape<.75?.72:1.38;
+    const tile={x:col*chunkSize+(random()-.5)*chunkSize*.68,y:row*chunkSize+(random()-.5)*chunkSize*.62,w:size*Math.sqrt(ratio),h:size/Math.sqrt(ratio),size,priority:random(),gap:58+random()*62};
     if(candidates.size>5000)candidates.clear();
     candidates.set(key,tile);return tile;
   }
@@ -184,11 +188,11 @@
     for(let dy=-3;dy<=3;dy++)for(let dx=-3;dx<=3;dx++){
       if(!dx&&!dy)continue;
       const other=candidate(col+dx,row+dy);
-      const distance=(tile.size+other.size)/2+Math.max(tile.gap,other.gap);
-      if(Math.abs(tile.x-other.x)<distance&&Math.abs(tile.y-other.y)<distance&&
+      const gap=Math.max(tile.gap,other.gap);
+      if(Math.abs(tile.x-other.x)<(tile.w+other.w)/2+gap&&Math.abs(tile.y-other.y)<(tile.h+other.h)/2+gap&&
         (other.priority>tile.priority||(other.priority===tile.priority&&(dy<0||(dy===0&&dx<0)))))return [];
     }
-    return [{x:tile.x-col*chunkSize-tile.size/2,y:tile.y-row*chunkSize-tile.size/2,size:tile.size}];
+    return [{x:tile.x-col*chunkSize-tile.w/2,y:tile.y-row*chunkSize-tile.h/2,w:tile.w,h:tile.h,size:tile.size}];
   }
   function resize(){width=innerWidth;height=innerHeight;scale=Math.max(.62,Math.min(width/1920,height/1080));dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);draw();}
   function draw(){
@@ -200,35 +204,38 @@
     ctx.fillStyle='#1c1c1c';
     for(let row=startRow;row<=endRow;row++)for(let col=startCol;col<=endCol;col++){
       for(const tile of layout(col,row)){
-        const px=left+(col*chunkSize+tile.x)*scale,py=top+(row*chunkSize+tile.y)*scale,w=tile.size*scale;
-        if(px>width||py>height||px+w<0||py+w<0)continue;
-        const radius=12+8*(tile.size-minSize)/(maxSize-minSize);
+        const px=left+(col*chunkSize+tile.x)*scale,py=top+(row*chunkSize+tile.y)*scale,w=tile.w*scale,h=tile.h*scale;
+        if(px>width||py>height||px+w<0||py+h<0)continue;
+        const radius=(13+9*(tile.size-minSize)/(maxSize-minSize))*scale;
         const key=col+','+row;
         const artwork=key===coverKey?cover:key===leftCoverKey?leftCover:null;
         const title=key===coverKey?'Пошлая Молли — Клеопатри':key===leftCoverKey?'Lil Wayne, Drake — Right Above It':null;
         const accent=key===accentKey;
-        const rendered={key,px,py,w,radius,title,surface:accent?accentSurface:null,hoverColor:artwork?.naturalWidth?(coverColors.get(artwork)||{h:0,s:0}):accent?accentHaze:null,cover:artwork?.naturalWidth?artwork.src:null};visibleTiles.push(rendered);
+        const rendered={key,px,py,w,h,radius,title,surface:accent?accentSurface:null,hoverColor:artwork?.naturalWidth?(coverColors.get(artwork)||{h:0,s:0}):accent?accentHaze:null,cover:artwork?.naturalWidth?artwork.src:null};visibleTiles.push(rendered);
         if(rendered.key===openedTile?.key){Object.assign(openedTile,rendered);continue;}
         const effect=effects.get(rendered.key);
         paintCard(rendered,effect);
         if(rendered.cover){
           ctx.save();ctx.clip();
-          const side=Math.min(artwork.naturalWidth,artwork.naturalHeight);
-          ctx.drawImage(artwork,(artwork.naturalWidth-side)/2,(artwork.naturalHeight-side)/2,side,side,px,py,w,w);
+          const sourceRatio=artwork.naturalWidth/artwork.naturalHeight,destRatio=w/h;
+          let sx=0,sy=0,sw=artwork.naturalWidth,sh=artwork.naturalHeight;
+          if(sourceRatio>destRatio){sw=sh*destRatio;sx=(artwork.naturalWidth-sw)/2;}
+          else{sh=sw/destRatio;sy=(artwork.naturalHeight-sh)/2;}
+          ctx.drawImage(artwork,sx,sy,sw,sh,px,py,w,h);
           ctx.restore();
         }
         if(effect)paintEffect(rendered,effect);
       }
     }
     if(coverKey===null&&visibleTiles.length){
-      coverKey=visibleTiles.reduce((best,t)=>Math.hypot(t.px+t.w/2-width/2,t.py+t.w/2-height/2)<Math.hypot(best.px+best.w/2-width/2,best.py+best.w/2-height/2)?t:best).key;
+      coverKey=visibleTiles.reduce((best,t)=>Math.hypot(t.px+t.w/2-width/2,t.py+t.h/2-height/2)<Math.hypot(best.px+best.w/2-width/2,best.py+best.h/2-height/2)?t:best).key;
       const [centerCol,centerRow]=coverKey.split(',').map(Number);
       const center=candidate(centerCol,centerRow);
       let nearest=Infinity;
       for(let row=centerRow-4;row<=centerRow+4;row++)for(let col=centerCol-4;col<=centerCol+1;col++){
         if(!layout(col,row).length)continue;
         const tile=candidate(col,row);
-        if(tile.x+tile.size/2>=center.x-center.size/2)continue;
+        if(tile.x+tile.w/2>=center.x-center.w/2)continue;
         const distance=Math.hypot(tile.x-center.x,2*(tile.y-center.y));
         if(distance<nearest){nearest=distance;leftCoverKey=col+','+row;}
       }
@@ -236,7 +243,7 @@
       for(let row=centerRow-4;row<=centerRow+4;row++)for(let col=centerCol-1;col<=centerCol+4;col++){
         if(!layout(col,row).length)continue;
         const tile=candidate(col,row);
-        if(tile.x-tile.size/2<=center.x+center.size/2)continue;
+        if(tile.x-tile.w/2<=center.x+center.w/2)continue;
         const distance=Math.hypot(tile.x-center.x,2*(tile.y-center.y));
         if(distance<nearestRight){nearestRight=distance;accentKey=col+','+row;}
       }
@@ -249,7 +256,7 @@
   function tick(time){const dt=Math.min((time-lastTime)/16.667,2);lastTime=time;x+=vx*dt;y+=vy*dt;vx*=Math.pow(inertiaDecay,dt);vy*=Math.pow(inertiaDecay,dt);draw();if(Math.abs(vx)+Math.abs(vy)>.05)raf=requestAnimationFrame(tick);else raf=0;}
   canvas.addEventListener('pointerdown',e=>{if(e.button!==0)return;stop();inertiaDecay=e.pointerType==='touch'?.96:.92;canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);drag={touch:e.pointerType==='touch',id:e.pointerId,px:e.clientX,py:e.clientY,startX:e.clientX,startY:e.clientY,time:performance.now(),moved:false};canvas.classList.add('dragging');updateHover();});
   canvas.addEventListener('pointermove',e=>{pointer=e.pointerType==='touch'?null:{x:e.clientX,y:e.clientY};if(!drag){updateHover();return;}if(e.pointerId!==drag.id)return;const now=performance.now(),dt=Math.max(8,now-drag.time);const dx=(e.clientX-drag.px)/scale,dy=(e.clientY-drag.py)/scale;x+=dx;y+=dy;const blend=drag.touch?1-Math.exp(-dt/45):1;vx+=(dx*16.667/dt-vx)*blend;vy+=(dy*16.667/dt-vy)*blend;drag.moved ||= Math.hypot(e.clientX-drag.startX,e.clientY-drag.startY)>5;drag.px=e.clientX;drag.py=e.clientY;drag.time=now;if(drag.touch)queueTouchDraw();else draw();});
-  function end(e){if(!drag||e.pointerId!==drag.id)return;const clicked=!drag.moved&&e.type==='pointerup';cancelAnimationFrame(touchDrawFrame);touchDrawFrame=0;const idle=performance.now()-drag.time;if(drag.touch){const release=Math.exp(-Math.max(0,idle-30)/65);vx*=release;vy*=release;}else if(idle>90)vx=vy=0;drag=null;canvas.classList.remove('dragging');if(clicked){stop();const hit=visibleTiles.find(t=>e.clientX>=t.px&&e.clientX<=t.px+t.w&&e.clientY>=t.py&&e.clientY<=t.py+t.w);if(hit){window.dispatchEvent(new CustomEvent('card-open',{detail:{...hit}}));}}else if(!matchMedia('(prefers-reduced-motion: reduce)').matches&&e.type==='pointerup'){lastTime=performance.now();raf=requestAnimationFrame(tick);}else stop();draw();updateHover();}
+  function end(e){if(!drag||e.pointerId!==drag.id)return;const clicked=!drag.moved&&e.type==='pointerup';cancelAnimationFrame(touchDrawFrame);touchDrawFrame=0;const idle=performance.now()-drag.time;if(drag.touch){const release=Math.exp(-Math.max(0,idle-30)/65);vx*=release;vy*=release;}else if(idle>90)vx=vy=0;drag=null;canvas.classList.remove('dragging');if(clicked){stop();const hit=visibleTiles.find(t=>e.clientX>=t.px&&e.clientX<=t.px+t.w&&e.clientY>=t.py&&e.clientY<=t.py+t.h);if(hit){window.dispatchEvent(new CustomEvent('card-open',{detail:{...hit}}));}}else if(!matchMedia('(prefers-reduced-motion: reduce)').matches&&e.type==='pointerup'){lastTime=performance.now();raf=requestAnimationFrame(tick);}else stop();draw();updateHover();}
   canvas.addEventListener('pointerleave',()=>{pointer=null;updateHover();});
   canvas.addEventListener('pointerup',end);canvas.addEventListener('pointercancel',end);canvas.addEventListener('lostpointercapture',end);
   canvas.addEventListener('wheel',e=>{e.preventDefault();pointer=null;updateHover();stop();let dx=e.deltaX,dy=e.deltaY;const unit=e.deltaMode===1?16:e.deltaMode===2?height:1;if(e.shiftKey&&dx===0){dx=dy;dy=0;}x-=dx*unit/scale;y-=dy*unit/scale;draw();},{passive:false});

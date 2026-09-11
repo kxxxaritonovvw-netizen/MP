@@ -148,7 +148,7 @@
   }
   let origin, animation, closing = false;
   function collapsed() {
-    return {left: `${origin.px}px`, top: `${origin.py}px`, width: `${origin.w}px`, height: `${origin.w}px`, margin: '0', right: 'auto', bottom: 'auto', borderRadius: `${origin.radius}px`};
+    return {left: `${origin.px}px`, top: `${origin.py}px`, width: `${origin.w}px`, height: `${origin.h || origin.w}px`, margin: '0', right: 'auto', bottom: 'auto', borderRadius: `${origin.radius}px`};
   }
   function expanded() {
     const box = modal.getBoundingClientRect();
