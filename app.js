@@ -2,6 +2,101 @@
   'use strict';
   const canvas = document.querySelector('#field');
   const ctx = canvas.getContext('2d', { alpha: false });
+  const sleeves=new Map();
+  function createSleeve(){
+  const sleeve=document.createElement('div');
+  sleeve.className='cover-3d';sleeve.setAttribute('aria-hidden','true');
+  sleeve.innerHTML='<div class="cover-3d-body"><div class="cover-3d-back"></div><div class="cover-3d-front"></div></div>';
+  document.querySelector('#app').append(sleeve);
+  const sleeveBody=sleeve.firstElementChild,sleeveFront=sleeveBody.lastElementChild;
+  const lightMap=document.createElement('canvas');
+  lightMap.className='cover-3d-light';lightMap.width=lightMap.height=48;
+  sleeveFront.append(lightMap);
+  const lightCtx=lightMap.getContext('2d');
+  const lightPixels=lightCtx.createImageData(48,48);
+  const normalize=([x,y,z])=>{const length=Math.hypot(x,y,z)||1;return [x/length,y/length,z/length];};
+  const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+  function illuminateSleeve(tile){
+    if(!tile)return;
+    const ax=tilt.x*Math.PI/180,ay=tilt.y*Math.PI/180;
+    const sx=Math.sin(ax),cx=Math.cos(ax),sy=Math.sin(ay),cy=Math.cos(ay);
+    // Same rotation order as CSS rotateX() rotateY(); +Z faces the viewer.
+    const normal=[sy,-sx*cy,cx*cy];
+    const rotate=(x,y)=>[cy*x,sx*sy*x+cx*y,-cx*sy*x+sx*y];
+    const center=[tile.px+tile.w/2,tile.py+tile.h/2,0];
+    // Neutral white light; the coating, rather than the lamp, splits its spectrum.
+    const light=[-160,-220,950];
+    const camera=[center[0],center[1],750];
+    const data=lightPixels.data;
+    for(let y=0;y<48;y++)for(let x=0;x<48;x++){
+      const offset=rotate(((x+.5)/48-.5)*tile.w,((y+.5)/48-.5)*tile.h);
+      const point=center.map((value,i)=>value+offset[i]);
+      const toLight=light.map((value,i)=>value-point[i]);
+      const distance=Math.hypot(...toLight);
+      const L=normalize(toLight),V=normalize(camera.map((value,i)=>value-point[i]));
+      const H=normalize(L.map((value,i)=>value+V[i]));
+      const diffuse=Math.max(0,dot(normal,L));
+      const attenuation=Math.min(1.25,1500/distance);
+      const alignment=Math.max(0,dot(normal,H));
+      const specular=Math.pow(alignment,42)*attenuation;
+      const illumination=(diffuse-.68)*.32*attenuation;
+      const white=Math.max(0,illumination)+specular*.32;
+      const shade=Math.max(0,-illumination);
+      // A thin-film reflection emerges around the specular angle and fades flat.
+      const angle=Math.hypot(tilt.x,tilt.y);
+      const reveal=Math.min(1,Math.max(0,(angle-4)/10));
+      const film=reveal*Math.exp(-Math.pow((alignment-.965)/.065,2))*.14;
+      const phase=(1-alignment)*18+(x/48)*.42+(y/48)*.18;
+      const spectrum=[0,2.094,4.189].map(shift=>205+40*Math.cos(phase*6.283+shift));
+      const total=white+shade+film;
+      const alpha=Math.min(.62,total);
+      const index=(y*48+x)*4;
+      for(let channel=0;channel<3;channel++){
+        data[index+channel]=(255*white+12*shade+spectrum[channel]*film)/(total||1);
+      }
+      data[index+3]=alpha*255;
+    }
+    lightCtx.putImageData(lightPixels,0,0);
+  }
+  // Parallel planes form a rounded solid, including its curved edge.
+  for(let i=1;i<14;i++){
+    const edge=document.createElement('div');edge.className='cover-3d-edge';
+    edge.style.transform=`translateZ(${-i}px)`;sleeveBody.prepend(edge);
+  }
+  let sleeveTile=null,sleeveFrame=0,sleeveTime=0;
+  const tilt={x:0,y:0,vx:0,vy:0};
+  function animateSleeve(time){
+    const dt=Math.min((time-sleeveTime)/1000||.016, .032);sleeveTime=time;
+    const t=sleeveTile;
+    const active=t&&!drag&&!openedTile&&pointer&&pointer.x>=t.px&&pointer.x<=t.px+t.w&&pointer.y>=t.py&&pointer.y<=t.py+t.h;
+    const targetX=active&&!reducedMotion.matches?-(pointer.y-t.py-t.h/2)/t.h*32:0;
+    const targetY=active&&!reducedMotion.matches?(pointer.x-t.px-t.w/2)/t.w*36:0;
+    for(const [axis,velocity,target] of [['x','vx',targetX],['y','vy',targetY]]){
+      tilt[velocity]+=(160*(target-tilt[axis])-20*tilt[velocity])*dt;
+      tilt[axis]+=tilt[velocity]*dt;
+    }
+    if(reducedMotion.matches){tilt.x=tilt.y=tilt.vx=tilt.vy=0;}
+    sleeveBody.style.transform=`rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`;
+    illuminateSleeve(t);
+    const moving=Math.abs(tilt.x-targetX)+Math.abs(tilt.y-targetY)+Math.abs(tilt.vx)+Math.abs(tilt.vy)>.02;
+    sleeveFrame=moving?requestAnimationFrame(animateSleeve):0;
+  }
+  return {
+    hide(){sleeveTile=null;sleeve.hidden=true;},
+    update(tile){
+      sleeveTile=tile;sleeve.hidden=false;
+      const palette=tile.hoverColor||{h:0,s:0};
+      sleeve.style.setProperty('--cover-hue',String(palette.h));
+      sleeve.style.setProperty('--cover-saturation',`${palette.s}%`);
+      Object.assign(sleeve.style,{left:`${tile.px}px`,top:`${tile.py}px`,width:`${tile.w}px`,height:`${tile.h}px`,borderRadius:`${tile.radius}px`});
+      if(sleeveFront.dataset.cover!==tile.cover){
+        sleeveFront.style.backgroundImage=`url("${tile.cover}")`;
+        sleeveFront.dataset.cover=tile.cover;
+      }
+      if(!sleeveFrame){sleeveTime=performance.now();sleeveFrame=requestAnimationFrame(animateSleeve);}
+    }
+  };
+  }
   let width=0,height=0,scale=1,dpr=1,x=0,y=0,vx=0,vy=0,raf=0,lastTime=0,drag=null;
   const size=300,minSize=250,maxSize=370,chunkSize=455;
   const candidates=new Map();
@@ -80,6 +175,7 @@
       effects.set(key,{amount:1,start:performance.now(),u:(pointer.x-hit.px)/hit.w,v:(pointer.y-hit.py)/hit.h});
     }
     hoveredKey=key;
+    draw();
     if(effects.size&&!effectFrame)effectFrame=requestAnimationFrame(animateEffects);
   }
   function animateEffects(time){
@@ -196,6 +292,7 @@
   }
   function resize(){width=innerWidth;height=innerHeight;scale=Math.max(.62,Math.min(width/1920,height/1080));dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);draw();}
   function draw(){
+    for(const sleeve of sleeves.values())sleeve.hide();
     ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle='#000';ctx.fillRect(0,0,width,height);
     const left=width/2+x*scale,top=height/2+y*scale;
     const startCol=Math.floor(-left/(chunkSize*scale))-2,endCol=Math.floor((width-left)/(chunkSize*scale))+2;
@@ -214,6 +311,13 @@
         const rendered={key,px,py,w,h,radius,title,surface:accent?accentSurface:null,hoverColor:artwork?.naturalWidth?(coverColors.get(artwork)||{h:0,s:0}):accent?accentHaze:null,cover:artwork?.naturalWidth?artwork.src:null};visibleTiles.push(rendered);
         if(rendered.key===openedTile?.key){Object.assign(openedTile,rendered);continue;}
         const effect=effects.get(rendered.key);
+        const dimensional=Boolean(rendered.cover);
+        if(dimensional){
+          if(!sleeves.has(key))sleeves.set(key,createSleeve());
+          sleeves.get(key).update(rendered);
+          if(effect)paintEffect(rendered,effect);
+          continue;
+        }
         paintCard(rendered,effect);
         if(rendered.cover){
           ctx.save();ctx.clip();

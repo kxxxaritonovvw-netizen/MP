@@ -1,0 +1,26 @@
+[
+  {
+    "vowel_window": [
+      24.9,
+      25.16
+    ],
+    "accent": 25.065,
+    "method": "band-energy peak inside forced-aligned stressed syllable; mixed audio, not isolated vocal pitch"
+  },
+  {
+    "vowel_window": [
+      110.33,
+      110.67
+    ],
+    "accent": 110.645,
+    "method": "band-energy peak inside forced-aligned stressed syllable; mixed audio, not isolated vocal pitch"
+  },
+  {
+    "vowel_window": [
+      147.05,
+      147.59
+    ],
+    "accent": 147.465,
+    "method": "band-energy peak inside forced-aligned stressed syllable; mixed audio, not isolated vocal pitch"
+  }
+]

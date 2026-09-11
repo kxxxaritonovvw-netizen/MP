@@ -1,5 +1,14 @@
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;color:#fff;font-family:Arial,Helvetica,sans-serif}#app{position:relative;width:100%;height:100%;background:#000}#field{display:block;width:100%;height:100%;cursor:grab;touch-action:none;outline:none}#field:focus-visible{outline:1px solid #777;outline-offset:-2px}#field.dragging{cursor:grabbing}
 /* Wide, gradual fade into the black canvas; gestures pass through. */
+.cover-3d{position:absolute;perspective:750px;pointer-events:none}
+.cover-3d[hidden]{display:none}
+.cover-3d-body{position:absolute;inset:0;border-radius:inherit;transform-style:preserve-3d;will-change:transform}
+.cover-3d-front,.cover-3d-back,.cover-3d-edge{position:absolute;inset:0;border-radius:inherit;backface-visibility:hidden}
+.cover-3d-edge{background:linear-gradient(130deg,#8b7d91,#302735 45%,#121016)}
+.cover-3d-back{transform:translateZ(-14px);background:#19151d;box-shadow:0 24px 42px #000b}
+.cover-3d-front{background-size:cover;background-position:center;box-shadow:inset 0 0 0 1px hsl(var(--cover-hue,0) var(--cover-saturation,0%) 65% / .08)}
+.cover-3d-light{position:absolute;inset:0;width:100%;height:100%;border-radius:inherit;pointer-events:none}
+.cover-3d-front::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 1px 1px 1px hsl(var(--cover-hue,0) var(--cover-saturation,0%) 70% / .06),inset -1px -1px 2px #0005}
 #app::after {
   content: "";
   position: absolute;

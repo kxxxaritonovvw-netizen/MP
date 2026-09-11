@@ -2,7 +2,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const files = new Set(['index.html', 'app.js', 'style.css', 'modal.js', 'modal.css']);
-const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.flac': 'audio/flac' };
+const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.flac': 'audio/flac', '.lrc': 'text/plain; charset=utf-8' };
 const clients = new Set();
 const versions = () => Object.fromEntries([...files].map(name => {
   try { const stat = fs.statSync(path.join(__dirname, name)); return [name, `${stat.mtimeMs}:${stat.size}`]; }
@@ -40,7 +40,7 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
-  const isAudio = /^audio\/[\w -]+\.(mp3|m4a|ogg|wav|flac)$/i.test(name);
+  const isAudio = /^audio\/(tracks|lyrics)\/[\w -]+\.(mp3|m4a|ogg|wav|flac|lrc)$/i.test(name);
   if (!files.has(name) && !isAudio) { res.writeHead(404); res.end(); return; }
   const filename = path.join(__dirname, name);
   fs.stat(filename, (error, stat) => {
