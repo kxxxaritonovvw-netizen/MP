@@ -175,7 +175,7 @@
     'Lil Wayne, Drake — Right Above It': 'audio/tracks/right-above-it.mp3'
   };
   const trackStarts = {
-    'Lil Wayne, Drake — Right Above It': 25.71
+    'Lil Wayne, Drake — Right Above It': 0
   };
   const playerArea = document.createElement('div');
   playerArea.className = 'modal-player';
@@ -313,11 +313,24 @@
       return { offset: t, transform: 'translate(' + dx + 'px,' + dy + 'px) scale(' + (1 - .9 * absorb * absorb) + ')', opacity: 1 - absorb * absorb };
     });
     const travel = flight.animate(trajectory, { duration: 1900, easing: 'cubic-bezier(.25,.05,.25,1)', fill: 'forwards' });
-    travel.finished.then(() => {
-      if (!closing && modal.open) {
+    // Use eased animation progress: absorption begins before the flight ends.
+    // Waiting for finished leaves a visible gap between contact and the ripple.
+    let contactFrame;
+    function checkContact() {
+      if (!lyricFlights.has(flight) || closing || !modal.open || travel.playState === 'idle') return;
+      const progress = travel.effect.getComputedTiming().progress;
+      if (progress !== null && progress >= .18 + .82 * .8) {
         rippleTimeline(landingPosition);
+        return;
       }
-    }).catch(() => {}).finally(() => { flight.remove(); lyricFlights.delete(flight); });
+      contactFrame = requestAnimationFrame(checkContact);
+    }
+    contactFrame = requestAnimationFrame(checkContact);
+    travel.finished.catch(() => {}).finally(() => {
+      cancelAnimationFrame(contactFrame);
+      flight.remove();
+      lyricFlights.delete(flight);
+    });
   }
   let subtitleLines = [], subtitleIndex = -2, subtitleFrame, lastWordTime = null;
   function releaseCompletedWords(audio, animate) {
@@ -464,7 +477,7 @@
   // Estimates from the mixed recording; analysis is saved in audio/analysis.
   const chorusAccents = {
     'Пошлая Молли — Клеопатри': [25.065, 110.645, 147.465],
-    'Lil Wayne, Drake — Right Above It': [81.39, 157.18, 232.97]
+    'Lil Wayne, Drake — Right Above It': [26.96, 81.39, 157.18, 232.97]
   };
   const fireworks = new Set();
   let lingeringHaze = null;
@@ -616,7 +629,8 @@
     lifetime.finished.catch(() => {}).finally(() => { layer.remove(); fireworks.delete(layer); });
   }
   function connectChorus(audio, title) {
-    const accents = chorusAccents[title] || [];
+    // Start the visual attack ahead of the musical peak so its expansion lands on it.
+    const accents = (chorusAccents[title] || []).map(accent => accent - .18);
     let previous = audio.currentTime, frame;
     function tick() {
       const now = audio.currentTime;
