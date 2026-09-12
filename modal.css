@@ -58,7 +58,8 @@
 .modal-waveform span.played{background:#c5c7d0}
 .card-modal[data-phase] .modal-waveform{opacity:0}
 
-.modal-subtitle{--sung:0%;position:absolute;top:calc(50% - 64px);left:40px;right:40px;transform:translateY(-50%);text-align:center;color:#eeeef2;font:700 clamp(24px,4vw,40px)/1.35 system-ui;letter-spacing:-.02em;pointer-events:none;display:grid;grid-auto-rows:1.35em;height:calc(4.05em + 12px);gap:6px}
+.modal-subtitle-frame{position:absolute;left:40px;right:40px;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:1}
+.modal-subtitle{--sung:0%;position:relative;width:100%;text-align:center;color:#eeeef2;font:700 clamp(24px,4vw,40px)/1.2 system-ui;letter-spacing:-.02em;pointer-events:none;display:grid;grid-auto-rows:1.2em;height:calc(3.6em + 8px);gap:4px}
 .modal-subtitle[hidden]{display:none}
 .card-modal[data-phase] .modal-subtitle{opacity:0}
 

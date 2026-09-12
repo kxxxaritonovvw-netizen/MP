@@ -181,9 +181,22 @@
   playerArea.className = 'modal-player';
   modal.append(playerArea);
   const subtitle = document.createElement('div');
+  const subtitleFrameBox = document.createElement('div');
+  subtitleFrameBox.className = 'modal-subtitle-frame';
+  modal.append(subtitleFrameBox);
   subtitle.className = 'modal-subtitle';
   subtitle.hidden = true;
-  modal.append(subtitle);
+  subtitleFrameBox.append(subtitle);
+  function layoutSubtitleFrame() {
+    const controlsBottom = Math.max(...[[playButton, playHint], [button, escapeHint]].map(([control, hint]) =>
+      control.offsetTop + (hint.offsetHeight ? hint.offsetTop + hint.offsetHeight : control.offsetHeight)));
+    subtitleFrameBox.style.top = controlsBottom + 'px';
+    // The revealed disc sits half outside the modal. Use its resting geometry
+    // so the lyrics do not drift while the disc slides into position.
+    subtitleFrameBox.style.bottom = discTray.offsetHeight / 2 + 'px';
+  }
+  const subtitleLayoutObserver = new ResizeObserver(layoutSubtitleFrame);
+  [modal, discTray, playHint, escapeHint].forEach(element => subtitleLayoutObserver.observe(element));
   const countdown = document.createElement('div');
   countdown.className = 'modal-countdown';
   countdown.hidden = true;

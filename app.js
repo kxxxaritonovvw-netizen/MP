@@ -187,46 +187,6 @@
     draw();
     effectFrame=effects.size?requestAnimationFrame(animateEffects):0;
   }
-  function paintEffect(tile,effect){
-    const {px,py,w,h}=tile;
-    const unit=Math.min(w,h);
-    const time=reducedMotion.matches ? .35 : (performance.now()-effect.start)/1000;
-    const phase=time*1.7;
-    const farEdge=Math.hypot(Math.max(effect.u,1-effect.u),Math.max(effect.v,1-effect.v));
-    const palette=tile.hoverColor;
-    ctx.save();
-    // Layered elliptical wisps: broad haze behind denser, drifting folds.
-    for(let layer=0;layer<3;layer++)for(let i=0;i<19;i++){
-      const noise=n=>{const v=Math.sin((i+1)*127.1+layer*311.7+n*74.7)*43758.5453;return v-Math.floor(v);};
-      const angle=i*2.399963+layer*1.7;
-      const spread=.55+noise(1)*.65;
-      const distance=Math.max(0,phase*spread+Math.sin(angle*3+time*1.8)*.12);
-      const progress=Math.min(1,distance/farEdge);
-      const fade=1-progress*progress*(3-2*progress);
-      const u=effect.u+Math.cos(angle)*distance+Math.sin(time*1.8+angle*2)*.1;
-      const v=effect.v+Math.sin(angle)*distance-time*(.035+noise(2)*.07);
-      const outside=Math.hypot(Math.max(0,-u,u-1),Math.max(0,-v,v-1));
-      const edge=Math.pow(Math.max(0,1-outside/.9),2);
-      const alpha=(layer===0?.048:.085)*(.55+noise(3)*.6)*effect.amount*fade*edge;
-      if(alpha<.001)continue;
-      const radius=unit*((layer===0?.46:.24)+noise(4)*.18);
-      const cx=px+u*w,cy=py+v*h;
-      const start=palette||{h:22,s:90};
-      const end=palette?.accent||palette||{h:45,s:100};
-      const blend=Math.min(1,progress/.85),smooth=blend*blend*(3-2*blend);
-      const hue=start.h+(((end.h-start.h+540)%360)-180)*smooth;
-      const saturation=start.s+(end.s-start.s)*smooth;
-      ctx.save();ctx.translate(cx,cy);ctx.rotate(angle+Math.sin(time+angle)*.2);
-      ctx.scale(1.15+noise(5)*.55,.65+noise(6)*.4);
-      const cloud=ctx.createRadialGradient(-radius*.12,0,0,0,0,radius);
-      cloud.addColorStop(0,'hsla('+hue+','+saturation+'%,70%,'+alpha+')');
-      cloud.addColorStop(.28,'hsla('+hue+','+saturation+'%,64%,'+(alpha*.7)+')');
-      cloud.addColorStop(.65,'hsla('+hue+','+saturation+'%,57%,'+(alpha*.2)+')');
-      cloud.addColorStop(1,'hsla('+hue+','+saturation+'%,52%,0)');
-      ctx.fillStyle=cloud;ctx.fillRect(-radius,-radius,radius*2,radius*2);ctx.restore();
-    }
-    ctx.restore();
-  }
   function paintCard(tile,effect){
     const {px,py,w,h,radius}=tile;
     const unit=Math.min(w,h);
@@ -315,7 +275,7 @@
         if(dimensional){
           if(!sleeves.has(key))sleeves.set(key,createSleeve());
           sleeves.get(key).update(rendered);
-          if(effect)paintEffect(rendered,effect);
+
           continue;
         }
         paintCard(rendered,effect);
@@ -328,7 +288,7 @@
           ctx.drawImage(artwork,sx,sy,sw,sh,px,py,w,h);
           ctx.restore();
         }
-        if(effect)paintEffect(rendered,effect);
+
       }
     }
     if(coverKey===null&&visibleTiles.length){
